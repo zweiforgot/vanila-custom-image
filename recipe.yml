@@ -24,23 +24,31 @@ stages:
       - lpkg --unlock
       - apt-get update
 
-  # ----------------------------
-  # Sunshine installation
-  # ----------------------------
   - name: install-sunshine
     type: shell
     commands:
-      - apt-get install -y wget udev dbus libdrm2 libgbm1 mesa-va-drivers vainfo
+      - apt-get install -y wget
       - wget https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-ubuntu-24.04-amd64.deb
       - apt-get install -y ./sunshine-ubuntu-24.04-amd64.deb
       - rm sunshine-ubuntu-24.04-amd64.deb
+
+  - name: sunshine-runtime-deps
+    type: shell
+    commands:
+      - apt-get install -y udev dbus libdrm2 libgbm1 mesa-va-drivers vainfo
+
+  - name: sunshine-input-permissions
+    type: shell
+    commands:
       - mkdir -p /etc/udev/rules.d
       - echo 'KERNEL=="uinput", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"' > /etc/udev/rules.d/85-sunshine.rules
+
+  - name: enable-sunshine-service
+    type: shell
+    commands:
+      - systemctl enable sunshine.service || true
       - mkdir -p /etc/sunshine
 
-  # ----------------------------
-  # Docker installation (safe for sid)
-  # ----------------------------
   - name: install-docker
     type: shell
     commands:
@@ -53,33 +61,17 @@ stages:
       - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
       - systemctl enable docker || true
 
-  # ----------------------------
-  # Deploy Pterodactyl panel + Wings from repo files
-  # ----------------------------
   - name: deploy-pterodactyl-files
-    type: shell
-    commands:
-      - mkdir -p /opt/pterodactyl
-      - cp /sources/modules/pterodactyl/docker-compose.yml /opt/pterodactyl/docker-compose.yml
-      - mkdir -p /etc/cloudflared
-      - cp /sources/modules/cloudflared/config.yml /etc/cloudflared/config.yml
+    type: includes
+    includes:
+      - modules/pterodactyl/docker-compose.yml
+      - modules/cloudflared/config.yml
 
-  - name: auto-start-wings
-    type: shell
-    commands:
-      - systemctl enable wings || true
-
-  # ----------------------------
-  # Abroot config
-  # ----------------------------
   - name: set-image-name-abroot
     type: includes
     includes:
       - modules/80-set-image-abroot-config.yml
 
-  # ----------------------------
-  # Cleanup
-  # ----------------------------
   - name: cleanup
     type: shell
     commands:
