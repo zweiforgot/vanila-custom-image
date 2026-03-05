@@ -26,7 +26,7 @@ stages:
       # Install Sunshine
       - dnf install -y sunshine
       # Optional: Allow Sunshine to bind to low ports or handle inputs
-      - usermod -aG input $USER
+      - usermod -aG input vanilla
 
   - name: init-setup
     type: shell
