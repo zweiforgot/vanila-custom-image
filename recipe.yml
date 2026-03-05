@@ -27,9 +27,11 @@ stages:
   - name: install-sunshine
     type: shell
     commands:
-      - dnf -y copr enable lizardbyte/stable
-      - dnf -y install sunshine --setopt=install_weak_deps=False
-      - dnf clean all
+      - apt-get install -y wget gnupg
+      - wget -qO - https://repo.lizardbyte.dev/public.key | gpg --dearmor -o /usr/share/keyrings/lizardbyte.gpg
+      - echo "deb [signed-by=/usr/share/keyrings/lizardbyte.gpg] https://repo.lizardbyte.dev/debian stable main" > /etc/apt/sources.list.d/lizardbyte.list
+      - apt-get update
+      - apt-get install -y sunshine
 
   - name: sunshine-runtime-deps
     type: shell
