@@ -22,9 +22,9 @@ stages:
     name: install-sunshine
     commands:
       # Add the LizardByte Copr repository
-      - sudo dnf copr enable -y lizardbyte/stable
+      - dnf copr enable -y lizardbyte/stable
       # Install Sunshine
-      - sudo dnf install -y sunshine
+      - dnf install -y sunshine
       # Optional: Allow Sunshine to bind to low ports or handle inputs
       - usermod -aG input $USER
 
