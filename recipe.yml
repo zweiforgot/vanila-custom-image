@@ -18,12 +18,6 @@ stages:
       - echo 'APT::Install-Recommends "1";' > /etc/apt/apt.conf.d/01norecommends
 
   modules:
-  - name: install-sunshine
-    type: shell
-    commands:
-      - dnf -y copr enable lizardbyte/stable
-      - dnf -y install sunshine --setopt=install_weak_deps=False
-      - dnf clean all
 
   - name: init-setup
     type: shell
@@ -33,11 +27,13 @@ stages:
 
   # Put your custom actions below this comment
 
-  - name: example-packages # Sample module using the built-in Apt module to install packages
-    type: apt
-    sources:
-      - packages:
-        - vim
+  - name: install-sunshine
+    type: shell
+    commands:
+    - dnf -y copr enable lizardbyte/stable
+    - dnf -y install sunshine --setopt=install_weak_deps=False
+    - dnf clean all
+
 
   - name: example-commands # Sample module demonstrating the Shell module with custom commands
     type: shell
