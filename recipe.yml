@@ -5,7 +5,7 @@ vibversion: 1.0.7
 stages:
 - id: build
   base: ghcr.io/vanilla-os/desktop:main
-  addincludes: true
+  addincludes: false
   singlelayer: false
   labels:
     maintainer: self-maintained
@@ -24,6 +24,7 @@ stages:
       - lpkg --unlock
       - apt-get update
 
+  # Sunshine installation
   - name: install-sunshine
     type: shell
     commands:
@@ -49,6 +50,7 @@ stages:
       - systemctl enable sunshine.service || true
       - mkdir -p /etc/sunshine
 
+  # Docker installation
   - name: install-docker
     type: shell
     commands:
@@ -61,24 +63,56 @@ stages:
       - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
       - systemctl enable docker || true
 
-  - name: deploy-pterodactyl-files
-    type: includes
-    includes:
-      - modules/pterodactyl/docker-compose.yml
-      - modules/cloudflared/config.yml
+  # Pterodactyl + Wings installation
+  - name: install-pterodactyl
+    type: shell
+    commands:
+      - apt-get install -y software-properties-common curl tar unzip jq
+      - useradd -m -d /var/lib/pterodactyl pterodactyl || true
+      - mkdir -p /var/www/pterodactyl
+      - curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/pterodactyl.tar.gz
+      - tar -xzf panel.tar.gz -C /var/www/pterodactyl
+      - rm panel.tar.gz
+      - chown -R www-data:www-data /var/www/pterodactyl
+      - chmod -R 755 /var/www/pterodactyl
+      - apt-get install -y mariadb-server mariadb-client php-cli php-mbstring php-bcmath php-curl php-gd php-mysql php-xml composer
+      - systemctl enable mariadb || true
 
+  - name: install-wings
+    type: shell
+    commands:
+      - curl -Lo /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
+      - chmod +x /usr/local/bin/wings
+      - systemctl enable wings || true
+      - mkdir -p /etc/pterodactyl
+      - chown pterodactyl:pterodactyl /etc/pterodactyl
+
+  # Cloudflared installation
+  - name: install-cloudflared
+    type: shell
+    commands:
+      - curl -LO https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+      - dpkg -i cloudflared-linux-amd64.deb || apt-get install -f -y
+      - rm cloudflared-linux-amd64.deb
+      - systemctl enable cloudflared || true
+
+  # Optional: image configuration
   - name: set-image-name-abroot
-    type: includes
-    includes:
-      - modules/80-set-image-abroot-config.yml
+    type: shell
+    commands:
+      - echo "IMAGE_NAME=ZweiDesktop" > /etc/image-config
 
+  # Cleanup
   - name: cleanup
     type: shell
     commands:
       - apt-get autoremove -y
       - apt-get clean
       - lpkg --lock
+      - rm -rf /tmp/*
+      - rm -rf /var/tmp/*
 
+  # FsGuard
   - name: fsguard
     type: fsguard
     CustomFsGuard: false
@@ -92,9 +126,3 @@ stages:
           - rm -rf /FsGuard
           - rm -f ./minisign.pub ./minisign.key
           - chmod +x /usr/sbin/init
-
-  - name: cleanup2
-    type: shell
-    commands:
-      - rm -rf /tmp/*
-      - rm -rf /var/tmp/*
