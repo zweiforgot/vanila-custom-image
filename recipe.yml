@@ -76,7 +76,7 @@ stages:
     type: shell
     commands:
       - mkdir -p /opt/pterodactyl
-      - printf "version: '3'\nservices:\n  panel:\n    image: ghcr.io/pterodactyl/panel:latest\n    restart: always\n    ports:\n      - \"8080:80\"\n    volumes:\n      - panel-data:/app/var\n    depends_on:\n      - database\n      - redis\n\n  database:\n    image: mariadb:10.5\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: pterodactyl\n      MYSQL_DATABASE: panel\n      MYSQL_USER: pterodactyl\n      MYSQL_PASSWORD: pterodactyl\n    volumes:\n      - db-data:/var/lib/mysql\n\n  redis:\n    image: redis:alpine\n    restart: always\n\nvolumes:\n  panel-data:\n  db-data:\n" > /opt/pterodactyl/docker-compose.yml
+      - printf "version: 3\nservices:\n  panel:\n    image: ghcr.io/pterodactyl/panel:latest\n    restart: always\n    ports:\n      - \"8080:80\"\n    volumes:\n      - panel-data:/app/var\n    depends_on:\n      - database\n      - redis\n\n  database:\n    image: mariadb:10.5\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: pterodactyl\n      MYSQL_DATABASE: panel\n      MYSQL_USER: pterodactyl\n      MYSQL_PASSWORD: pterodactyl\n    volumes:\n      - db-data:/var/lib/mysql\n\n  redis:\n    image: redis:alpine\n    restart: always\n\nvolumes:\n  panel-data:\n  db-data:\n" > /opt/pterodactyl/docker-compose.yml
 
   - name: install-cloudflare
     type: shell
