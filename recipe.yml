@@ -18,15 +18,12 @@ stages:
       - echo 'APT::Install-Recommends "1";' > /etc/apt/apt.conf.d/01norecommends
 
   modules:
-  - type: shell
-    name: install-sunshine
+  - name: install-sunshine
+    type: shell
     commands:
-      # Add the LizardByte Copr repository
-      - dnf copr enable -y lizardbyte/stable
-      # Install Sunshine
-      - dnf install -y sunshine
-      # Optional: Allow Sunshine to bind to low ports or handle inputs
-      - usermod -aG input vanilla
+      - dnf -y copr enable lizardbyte/stable
+      - dnf -y install sunshine --setopt=install_weak_deps=False
+      - dnf clean all
 
   - name: init-setup
     type: shell
