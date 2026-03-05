@@ -16,13 +16,9 @@ stages:
 
   runs:
     commands:
-      - echo 'APT::Install-Recommends "1";' > /etc/apt/apt.conf.d/01norecommends
+      - echo 'APT::Install-Recommends "0";' > /etc/apt/apt.conf.d/01norecommends
 
   modules:
-
-  ################################################
-  # Init
-  ################################################
 
   - name: init
     type: shell
@@ -30,182 +26,87 @@ stages:
       - lpkg --unlock
       - apt-get update
 
-  ################################################
-  # GPU runtime + Sunshine
-  ################################################
-
-  - name: sunshine-install
+  - name: install-base-tools
     type: shell
     commands:
-      - apt-get install -y wget udev dbus libdrm2 libgbm1 mesa-va-drivers vainfo ffmpeg
-      - wget -q https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-ubuntu-24.04-amd64.deb
+      - apt-get install -y curl wget gnupg ca-certificates lsb-release
+
+  - name: install-sunshine
+    type: shell
+    commands:
+      - wget https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-ubuntu-24.04-amd64.deb
       - apt-get install -y ./sunshine-ubuntu-24.04-amd64.deb
       - rm sunshine-ubuntu-24.04-amd64.deb
 
-  - name: sunshine-input
+  - name: sunshine-runtime
+    type: shell
+    commands:
+      - apt-get install -y udev dbus libdrm2 libgbm1 mesa-va-drivers vainfo
+
+  - name: sunshine-permissions
     type: shell
     commands:
       - mkdir -p /etc/udev/rules.d
-      - echo 'KERNEL=="uinput", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"' > /etc/udev/rules.d/85-sunshine.rules
-
-  ################################################
-  # Docker (sid-safe)
-  ################################################
+      - printf 'KERNEL=="uinput", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"\n' > /etc/udev/rules.d/85-sunshine.rules
 
   - name: docker-install
     type: shell
     commands:
-      - apt-get install -y docker.io docker-compose-plugin
-      - groupadd -f docker
+      - install -m 0755 -d /etc/apt/keyrings
+      - curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+      - chmod a+r /etc/apt/keyrings/docker.asc
+      - printf "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable\n" > /etc/apt/sources.list.d/docker.list
+      - apt-get update
+      - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-  ################################################
-  # Pterodactyl Wings
-  ################################################
-
-  - name: wings-install
+  - name: install-wings
     type: shell
     commands:
       - mkdir -p /etc/pterodactyl
-      - mkdir -p /var/lib/pterodactyl
-      - wget -q https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
-      - install -m755 wings_linux_amd64 /usr/local/bin/wings
-      - rm wings_linux_amd64
+      - curl -L https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64 -o /usr/local/bin/wings
+      - chmod +x /usr/local/bin/wings
 
   - name: wings-service
     type: shell
     commands:
       - mkdir -p /etc/systemd/system
-      - |
-        cat > /etc/systemd/system/wings.service << 'EOF'
-        [Unit]
-        Description=Pterodactyl Wings Daemon
-        After=docker.service
-        Requires=docker.service
-
-        [Service]
-        User=root
-        WorkingDirectory=/etc/pterodactyl
-        ExecStart=/usr/local/bin/wings
-        Restart=always
-        LimitNOFILE=4096
-
-        [Install]
-        WantedBy=multi-user.target
-        EOF
-
-  ################################################
-  # Pterodactyl Panel (Docker)
-  ################################################
+      - printf "[Unit]\nDescription=Pterodactyl Wings\nAfter=docker.service\nRequires=docker.service\n\n[Service]\nUser=root\nWorkingDirectory=/etc/pterodactyl\nExecStart=/usr/local/bin/wings\nRestart=always\nLimitNOFILE=4096\n\n[Install]\nWantedBy=multi-user.target\n" > /etc/systemd/system/wings.service
 
   - name: panel-deploy
     type: shell
     commands:
       - mkdir -p /opt/pterodactyl
-      - |
-        cat > /opt/pterodactyl/docker-compose.yml << 'EOF'
-        version: '3'
-        services:
-          panel:
-            image: ghcr.io/pterodactyl/panel:latest
-            restart: always
-            ports:
-              - "8080:80"
-            volumes:
-              - panel-data:/app/var
-            depends_on:
-              - database
-              - redis
+      - printf "version: '3'\nservices:\n  panel:\n    image: ghcr.io/pterodactyl/panel:latest\n    restart: always\n    ports:\n      - \"8080:80\"\n    volumes:\n      - panel-data:/app/var\n    depends_on:\n      - database\n      - redis\n\n  database:\n    image: mariadb:10.5\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: pterodactyl\n      MYSQL_DATABASE: panel\n      MYSQL_USER: pterodactyl\n      MYSQL_PASSWORD: pterodactyl\n    volumes:\n      - db-data:/var/lib/mysql\n\n  redis:\n    image: redis:alpine\n    restart: always\n\nvolumes:\n  panel-data:\n  db-data:\n" > /opt/pterodactyl/docker-compose.yml
 
-          database:
-            image: mariadb:10.5
-            restart: always
-            environment:
-              MYSQL_ROOT_PASSWORD: pterodactyl
-              MYSQL_DATABASE: panel
-              MYSQL_USER: pterodactyl
-              MYSQL_PASSWORD: pterodactyl
-            volumes:
-              - db-data:/var/lib/mysql
-
-          redis:
-            image: redis:alpine
-            restart: always
-
-        volumes:
-          panel-data:
-          db-data:
-        EOF
-
-  ################################################
-  # Cloudflare tunnel
-  ################################################
-
-  - name: cloudflare-tunnel
+  - name: install-cloudflare
     type: shell
     commands:
-      - wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-      - install -m755 cloudflared-linux-amd64 /usr/local/bin/cloudflared
-      - rm cloudflared-linux-amd64
+      - curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+      - chmod +x /usr/local/bin/cloudflared
 
   - name: cloudflare-service
     type: shell
     commands:
-      - |
-        cat > /etc/systemd/system/cloudflared.service << 'EOF'
-        [Unit]
-        Description=Cloudflare Tunnel
-        After=network.target
-
-        [Service]
-        Type=simple
-        ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate run
-        Restart=always
-        RestartSec=5s
-
-        [Install]
-        WantedBy=multi-user.target
-        EOF
-
-  ################################################
-  # First boot automation
-  ################################################
+      - printf "[Unit]\nDescription=Cloudflare Tunnel\nAfter=network.target\n\n[Service]\nType=simple\nExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate run\nRestart=always\nRestartSec=5s\n\n[Install]\nWantedBy=multi-user.target\n" > /etc/systemd/system/cloudflared.service
 
   - name: firstboot-script
     type: shell
     commands:
-      - |
-        cat > /usr/local/bin/zwei-firstboot << 'EOF'
-        #!/bin/bash
-        docker compose -f /opt/pterodactyl/docker-compose.yml up -d || true
-        systemctl enable wings
-        systemctl enable cloudflared
-        systemctl enable docker
-        EOF
+      - printf "#!/bin/bash\n\ndocker compose -f /opt/pterodactyl/docker-compose.yml up -d || true\nsystemctl enable wings || true\nsystemctl enable docker || true\nsystemctl enable cloudflared || true\n" > /usr/local/bin/zwei-firstboot
       - chmod +x /usr/local/bin/zwei-firstboot
-
-  ################################################
-  # Vanilla metadata
-  ################################################
 
   - name: set-image-name-abroot
     type: includes
     includes:
       - modules/80-set-image-abroot-config.yml
 
-  ################################################
-  # Cleanup
-  ################################################
-
   - name: cleanup
     type: shell
     commands:
       - apt-get autoremove -y
       - apt-get clean
+      - rm -rf /var/lib/apt/lists/*
       - lpkg --lock
-
-  ################################################
-  # FsGuard
-  ################################################
 
   - name: fsguard
     type: fsguard
@@ -213,7 +114,6 @@ stages:
     FsGuardLocation: "/usr/sbin/FsGuard"
     GenerateKey: true
     FilelistPaths: ["/usr/bin"]
-
     modules:
       - name: remove-prev-fsguard
         type: shell
@@ -221,10 +121,6 @@ stages:
           - rm -rf /FsGuard
           - rm -f ./minisign.pub ./minisign.key
           - chmod +x /usr/sbin/init
-
-  ################################################
-  # Final cleanup
-  ################################################
 
   - name: cleanup2
     type: shell
