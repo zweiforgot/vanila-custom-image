@@ -70,7 +70,7 @@ stages:
       - apt-get install -y software-properties-common curl tar unzip jq
       - useradd -m -d /var/lib/pterodactyl pterodactyl || true
       - mkdir -p /var/www/pterodactyl
-      - curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/pterodactyl.tar.gz
+      - curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/download/v1.11.11/panel.tar.gz
       - tar -xzf panel.tar.gz -C /var/www/pterodactyl
       - rm panel.tar.gz
       - chown -R www-data:www-data /var/www/pterodactyl
