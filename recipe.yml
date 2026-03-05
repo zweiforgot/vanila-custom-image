@@ -31,10 +31,26 @@ stages:
       - dnf -y install sunshine --setopt=install_weak_deps=False
       - dnf clean all
 
-  - name: example-commands
+  - name: sunshine-runtime-deps
     type: shell
     commands:
-      - echo Example output
+      - apt-get install -y udev dbus libdrm2 libgbm1 mesa-va-drivers vainfo
+
+  - name: sunshine-input-permissions
+    type: shell
+    commands:
+      - mkdir -p /etc/udev/rules.d
+      - echo 'KERNEL=="uinput", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"' > /etc/udev/rules.d/85-sunshine.rules
+
+  - name: enable-sunshine-service
+    type: shell
+    commands:
+      - systemctl enable sunshine.service || true
+
+  - name: sunshine-config
+    type: shell
+    commands:
+      - mkdir -p /etc/sunshine
 
   - name: set-image-name-abroot
     type: includes
