@@ -1,5 +1,5 @@
-name: Custom Vanilla Desktop # Replace this name with your image name
-id: custom # Replace this ID with your image ID
+name: Zwei Vanilla Desktop # Replace this name with your image name
+id: zwei # Replace this ID with your image ID
 vibversion: 1.0.7
 
 stages:
@@ -18,6 +18,16 @@ stages:
       - echo 'APT::Install-Recommends "1";' > /etc/apt/apt.conf.d/01norecommends
 
   modules:
+  - type: shell
+    name: install-sunshine
+    commands:
+      # Add the LizardByte Copr repository
+      - sudo dnf copr enable -y lizardbyte/stable
+      # Install Sunshine
+      - sudo dnf install -y sunshine
+      # Optional: Allow Sunshine to bind to low ports or handle inputs
+      - usermod -aG input $USER
+
   - name: init-setup
     type: shell
     commands:
