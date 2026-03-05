@@ -1,0 +1,31 @@
+version: "3"
+services:
+  panel:
+    image: ghcr.io/pterodactyl/panel:latest
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - panel-data:/app/var
+    depends_on:
+      - database
+      - redis
+
+  database:
+    image: mariadb:10.5
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: pterodactyl
+      MYSQL_DATABASE: panel
+      MYSQL_USER: pterodactyl
+      MYSQL_PASSWORD: pterodactyl
+    volumes:
+      - db-data:/var/lib/mysql
+
+  redis:
+    image: redis:alpine
+    restart: always
+
+volumes:
+  panel-data:
+  db-data:

@@ -24,95 +24,62 @@ stages:
       - lpkg --unlock
       - apt-get update
 
+  # ----------------------------
+  # Sunshine installation
+  # ----------------------------
   - name: install-sunshine
     type: shell
     commands:
-      - apt-get install -y wget gdebi-core
+      - apt-get install -y wget udev dbus libdrm2 libgbm1 mesa-va-drivers vainfo
       - wget https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-ubuntu-24.04-amd64.deb
-      - gdebi -n ./sunshine-ubuntu-24.04-amd64.deb
-      - rm ./sunshine-ubuntu-24.04-amd64.deb
-
-  - name: sunshine-runtime-deps
-    type: shell
-    commands:
-      - apt-get install -y udev dbus libdrm2 libgbm1 mesa-va-drivers vainfo
-
-  - name: sunshine-input-permissions
-    type: shell
-    commands:
+      - apt-get install -y ./sunshine-ubuntu-24.04-amd64.deb
+      - rm sunshine-ubuntu-24.04-amd64.deb
       - mkdir -p /etc/udev/rules.d
       - echo 'KERNEL=="uinput", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"' > /etc/udev/rules.d/85-sunshine.rules
-
-  - name: sunshine-config
-    type: shell
-    commands:
       - mkdir -p /etc/sunshine
 
+  # ----------------------------
+  # Docker installation (safe for sid)
+  # ----------------------------
   - name: install-docker
     type: shell
     commands:
       - apt-get install -y ca-certificates curl gnupg lsb-release
-      - install -m 0755 -d /etc/apt/keyrings
+      - mkdir -p /etc/apt/keyrings
       - curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
       - chmod a+r /etc/apt/keyrings/docker.asc
       - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
       - apt-get update
       - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      - systemctl enable docker || true
 
-  - name: pterodactyl-setup
+  # ----------------------------
+  # Deploy Pterodactyl panel + Wings from repo files
+  # ----------------------------
+  - name: deploy-pterodactyl-files
     type: shell
     commands:
       - mkdir -p /opt/pterodactyl
-      - echo "version: '3'" > /opt/pterodactyl/docker-compose.yml
-      - echo "services:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "  panel:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    image: ghcr.io/pterodactyl/panel:latest" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    restart: always" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    ports:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "      - '8080:80'" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    volumes:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "      - panel-data:/app/var" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    depends_on:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "      - database" >> /opt/pterodactyl/docker-compose.yml
-      - echo "      - redis" >> /opt/pterodactyl/docker-compose.yml
-      - echo "  database:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    image: mariadb:10.5" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    restart: always" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    environment:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "      MYSQL_ROOT_PASSWORD: pterodactyl" >> /opt/pterodactyl/docker-compose.yml
-      - echo "      MYSQL_DATABASE: panel" >> /opt/pterodactyl/docker-compose.yml
-      - echo "      MYSQL_USER: pterodactyl" >> /opt/pterodactyl/docker-compose.yml
-      - echo "      MYSQL_PASSWORD: pterodactyl" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    volumes:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "      - db-data:/var/lib/mysql" >> /opt/pterodactyl/docker-compose.yml
-      - echo "  redis:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    image: redis:alpine" >> /opt/pterodactyl/docker-compose.yml
-      - echo "    restart: always" >> /opt/pterodactyl/docker-compose.yml
-      - echo "volumes:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "  panel-data:" >> /opt/pterodactyl/docker-compose.yml
-      - echo "  db-data:" >> /opt/pterodactyl/docker-compose.yml
-
-  - name: wings-service
-    type: shell
-    commands:
-      - docker-compose -f /opt/pterodactyl/docker-compose.yml up -d wings
-
-  - name: cloudflare-tunnel
-    type: shell
-    commands:
-      - curl -s https://pkg.cloudflare.com/cloudflared/pubkey.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflared.gpg
-      - echo "deb [signed-by=/usr/share/keyrings/cloudflared.gpg] https://pkg.cloudflare.com/cloudflared stable main" > /etc/apt/sources.list.d/cloudflared.list
-      - apt-get update
-      - apt-get install -y cloudflared
+      - cp /sources/modules/pterodactyl/docker-compose.yml /opt/pterodactyl/docker-compose.yml
       - mkdir -p /etc/cloudflared
-      - echo "tunnel: ptero-tunnel" > /etc/cloudflared/config.yml
-      - echo "url: http://localhost:8080" >> /etc/cloudflared/config.yml
+      - cp /sources/modules/cloudflared/config.yml /etc/cloudflared/config.yml
 
+  - name: auto-start-wings
+    type: shell
+    commands:
+      - systemctl enable wings || true
+
+  # ----------------------------
+  # Abroot config
+  # ----------------------------
   - name: set-image-name-abroot
     type: includes
     includes:
       - modules/80-set-image-abroot-config.yml
 
+  # ----------------------------
+  # Cleanup
+  # ----------------------------
   - name: cleanup
     type: shell
     commands:
